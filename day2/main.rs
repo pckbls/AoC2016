@@ -1,3 +1,4 @@
+use std::env;
 use std::io;
 use std::io::prelude::*;
 
@@ -48,7 +49,37 @@ fn keypad_one(position: &Position) -> Result<char, &'static str> {
     }
 }
 
+fn keypad_two(position: &Position) -> Result<char, &'static str> {
+    match *position {
+        Position { x: 0, y: -2 } => Ok('1'),
+        Position { x: -1, y: -1 } => Ok('2'),
+        Position { x: 0, y: -1 } => Ok('3'),
+        Position { x: 1, y: -1 } => Ok('4'),
+        Position { x: -2, y: 0 } => Ok('5'),
+        Position { x: -1, y: 0 } => Ok('6'),
+        Position { x: 0, y: 0 } => Ok('7'),
+        Position { x: 1, y: 0 } => Ok('8'),
+        Position { x: 2, y: 0 } => Ok('9'),
+        Position { x: -1, y: 1 } => Ok('A'),
+        Position { x: 0, y: 1 } => Ok('B'),
+        Position { x: 1, y: 1 } => Ok('C'),
+        Position { x: 0, y: 2 } => Ok('D'),
+        Position { .. } => Err("Position outside of key pad boundaries")
+    }
+}
+
 fn main() {
+    // Initialize our key pad based on the command line arguments.
+    let keypad_func: KeypadFunc = match env::args().nth(1) {
+        Some(ref x) if x == "one" => keypad_one,
+        Some(ref x) if x == "two" => keypad_two,
+        _ => {
+            println!("Usage: {} <one|two>", env::args().nth(0).unwrap());
+            println!("Two first argument specifies the key pad to use.");
+            return;
+        }
+    };
+
     // Initialize our actions vector.
     let mut actions: Vec<Action> = Vec::new();
 
@@ -69,9 +100,6 @@ fn main() {
 
         actions.push(Action::Press);
     }
-
-    // Initialize our key pad.
-    let keypad_func: KeypadFunc = keypad_one;
 
     // Initialize our finger.
     let mut finger = Finger {
