@@ -5,38 +5,10 @@ enum Direction { Up, Down, Left, Right }
 enum Action { Move(Direction), Press }
 struct Position { x: i32, y: i32 }
 
-// The Keypad trait needs exactly one method to be implemented:
-// It shall return a key based on a position with two coordinates.
-// If the position is outside the key pad then it shall return an error.
-// That way we can determine the boundaries of our key pad when moving
-// the finger.
-trait Keypad {
-    fn position_to_key(&self, &Position) -> Result<char, &'static str>;
-}
-
-// The implementation of the key pad for the first part.
-struct KeypadOne { }
-impl Keypad for KeypadOne {
-    fn position_to_key(&self, position: &Position) -> Result<char, &'static str> {
-        match *position {
-            Position { x: -1, y: -1 } => Ok('1'),
-            Position { x: 0,  y: -1 } => Ok('2'),
-            Position { x: 1,  y: -1 } => Ok('3'),
-            Position { x: -1, y: 0  } => Ok('4'),
-            Position { x: 0,  y: 0  } => Ok('5'),
-            Position { x: 1,  y: 0  } => Ok('6'),
-            Position { x: -1, y: 1 } => Ok('7'),
-            Position { x: 0,  y: 1 } => Ok('8'),
-            Position { x: 1,  y: 1 } => Ok('9'),
-            Position { .. } => Err("Position outside of key pad boundaries")
-        }
-    }
-}
-
 // Our finger has a position and is attached to a key pad.
 // It can move around in any of the four directions and push a key.
-struct Finger<K> { position: Position, keypad: K }
-impl<K: Keypad> Finger<K> {
+struct Finger { position: Position, keypad_func: KeypadFunc }
+impl Finger {
     fn move_in_direction(&mut self, direction: &Direction) {
         let new_position = match *direction {
             Direction::Up => Position { x: self.position.x, y: self.position.y - 1 },
@@ -45,13 +17,34 @@ impl<K: Keypad> Finger<K> {
             Direction::Right => Position { x: self.position.x + 1, y: self.position.y },
         };
 
-        if let Ok(_) = self.keypad.position_to_key(&new_position) {
+        if let Ok(_) = (self.keypad_func)(&new_position) {
             self.position = new_position;
         }
     }
 
     fn push_key(&self) {
-        print!("{}", self.keypad.position_to_key(&self.position).unwrap());
+        print!("{}", (self.keypad_func)(&self.position).unwrap());
+    }
+}
+
+// The KeypadFunc maps a Position onto a key.
+// If the position is outside the key pad then it shall return an error.
+// That way we can clamp the finger position inside the boundaries
+// of our key pad.
+type KeypadFunc = fn(&Position) -> Result<char, &'static str>;
+
+fn keypad_one(position: &Position) -> Result<char, &'static str> {
+    match *position {
+        Position { x: -1, y: -1 } => Ok('1'),
+        Position { x: 0,  y: -1 } => Ok('2'),
+        Position { x: 1,  y: -1 } => Ok('3'),
+        Position { x: -1, y: 0  } => Ok('4'),
+        Position { x: 0,  y: 0  } => Ok('5'),
+        Position { x: 1,  y: 0  } => Ok('6'),
+        Position { x: -1, y: 1 } => Ok('7'),
+        Position { x: 0,  y: 1 } => Ok('8'),
+        Position { x: 1,  y: 1 } => Ok('9'),
+        Position { .. } => Err("Position outside of key pad boundaries")
     }
 }
 
@@ -78,12 +71,12 @@ fn main() {
     }
 
     // Initialize our key pad.
-    let keypad = KeypadOne { };
+    let keypad_func: KeypadFunc = keypad_one;
 
     // Initialize our finger.
     let mut finger = Finger {
         position: Position { x: 0, y: 0 },
-        keypad: keypad
+        keypad_func: keypad_func
     };
 
     // Perform all the actions.
