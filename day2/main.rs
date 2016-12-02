@@ -1,54 +1,57 @@
 use std::io;
 use std::io::prelude::*;
-use std::fmt;
 
 enum Direction { Up, Down, Left, Right }
 enum Action { Move(Direction), Press }
+struct Position { x: i32, y: i32 }
 
-#[derive(Copy, Clone)]
-struct Keypad { x: i32, y: i32 }
-impl Keypad {
-    fn move_finger(&mut self, direction: &Direction) {
-        let new_keypad = match *direction {
-            Direction::Up => Keypad { x: self.x, y: self.y - 1 },
-            Direction::Down => Keypad { x: self.x, y: self.y + 1 },
-            Direction::Left => Keypad { x: self.x - 1 , y: self.y },
-            Direction::Right => Keypad { x: self.x + 1, y: self.y },
-        };
+// The Keypad trait needs exactly one method to be implemented:
+// It shall return a key based on a position with two coordinates.
+// If the position is outside the key pad then it shall return an error.
+// That way we can determine the boundaries of our key pad when moving
+// the finger.
+trait Keypad {
+    fn position_to_key(&self, &Position) -> Result<char, &'static str>;
+}
 
-        if let Ok(_) = Keypad::position_to_key(&new_keypad) {
-            self.x = new_keypad.x;
-            self.y = new_keypad.y;
-        }
-    }
-
-    fn press_finger(&self) {
-        print!("{}", self);
-    }
-
-    fn position_to_key(keypad: &Keypad) -> Result<u16, &'static str> {
-        match *keypad {
-            Keypad { x: -1, y: -1 } => Ok(1),
-            Keypad { x: 0,  y: -1 } => Ok(2),
-            Keypad { x: 1,  y: -1 } => Ok(3),
-            Keypad { x: -1, y: 0  } => Ok(4),
-            Keypad { x: 0,  y: 0  } => Ok(5),
-            Keypad { x: 1,  y: 0  } => Ok(6),
-            Keypad { x: -1, y: 1 } => Ok(7),
-            Keypad { x: 0,  y: 1 } => Ok(8),
-            Keypad { x: 1,  y: 1 } => Ok(9),
-            Keypad { .. } => Err("Position outside of key pad boundaries")
+// The implementation of the key pad for the first part.
+struct KeypadOne { }
+impl Keypad for KeypadOne {
+    fn position_to_key(&self, position: &Position) -> Result<char, &'static str> {
+        match *position {
+            Position { x: -1, y: -1 } => Ok('1'),
+            Position { x: 0,  y: -1 } => Ok('2'),
+            Position { x: 1,  y: -1 } => Ok('3'),
+            Position { x: -1, y: 0  } => Ok('4'),
+            Position { x: 0,  y: 0  } => Ok('5'),
+            Position { x: 1,  y: 0  } => Ok('6'),
+            Position { x: -1, y: 1 } => Ok('7'),
+            Position { x: 0,  y: 1 } => Ok('8'),
+            Position { x: 1,  y: 1 } => Ok('9'),
+            Position { .. } => Err("Position outside of key pad boundaries")
         }
     }
 }
-impl fmt::Display for Keypad {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let key = match Keypad::position_to_key(&self) {
-            Ok(num) => num,
-            Err(_) => panic!("This should not happen.")
+
+// Our finger has a position and is attached to a key pad.
+// It can move around in any of the four directions and push a key.
+struct Finger<K> { position: Position, keypad: K }
+impl<K: Keypad> Finger<K> {
+    fn move_in_direction(&mut self, direction: &Direction) {
+        let new_position = match *direction {
+            Direction::Up => Position { x: self.position.x, y: self.position.y - 1 },
+            Direction::Down => Position { x: self.position.x, y: self.position.y + 1 },
+            Direction::Left => Position { x: self.position.x - 1 , y: self.position.y },
+            Direction::Right => Position { x: self.position.x + 1, y: self.position.y },
         };
 
-        write!(f, "{}", key)
+        if let Ok(_) = self.keypad.position_to_key(&new_position) {
+            self.position = new_position;
+        }
+    }
+
+    fn push_key(&self) {
+        print!("{}", self.keypad.position_to_key(&self.position).unwrap());
     }
 }
 
@@ -74,14 +77,20 @@ fn main() {
         actions.push(Action::Press);
     }
 
-    // Initialize key pad.
-    let mut keypad = Keypad { x: 0, y: 0 };
+    // Initialize our key pad.
+    let keypad = KeypadOne { };
+
+    // Initialize our finger.
+    let mut finger = Finger {
+        position: Position { x: 0, y: 0 },
+        keypad: keypad
+    };
 
     // Perform all the actions.
     for action in &actions {
         match *action {
-            Action::Move(ref direction) => keypad.move_finger(direction),
-            Action::Press => keypad.press_finger(),
+            Action::Move(ref direction) => finger.move_in_direction(direction),
+            Action::Press => finger.push_key(),
         };
     }
 
